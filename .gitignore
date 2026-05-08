@@ -1,0 +1,24 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Runtime data
+pantanakerfi.db
+pantanakerfi.db.bak*
+pantanakerfi.db-wal
+pantanakerfi.db-shm
+uploads/
+
+# Python
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Editor / OS noise
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

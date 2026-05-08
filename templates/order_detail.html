@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Pöntun #{{ order.id }} – Pantanakerfi{% endblock %}
+{% block body %}
+<div class="header">
+    <h1><a href="{{ url_for('board') }}" style="color:inherit;">Pantanakerfi</a></h1>
+    <button class="theme-toggle" onclick="toggleTheme()" title="Ljóst/Dökkt"></button>
+</div>
+<div class="detail-wrap">
+    <div class="detail-card">
+        <h2>{{ order.customer_name }}</h2>
+        <div class="sub">{{ order.product_name }}{% if order.product_model %} – {{ order.product_model }}{% endif %}</div>
+
+        <div class="detail-status-pipeline">
+            {% for s in statuses %}
+                <span class="step
+                    {%- if loop.index0 < status_idx %} done
+                    {%- elif loop.index0 == status_idx %} active{% endif %}">
+                    {{ s }}
+                </span>
+            {% endfor %}
+        </div>
+
+        <dl class="detail-grid">
+            <dt>Símanúmer</dt>
+            <dd>{{ order.phone or '–' }}</dd>
+
+            <dt>Netfang</dt>
+            <dd>{{ order.email or '–' }}</dd>
+
+            <dt>Birgir</dt>
+            <dd>{{ order.supplier or '–' }}</dd>
+
+            <dt>Forgangur</dt>
+            <dd>{{ order.priority }}</dd>
+
+            <dt>Greiðslustaða</dt>
+            <dd>{{ order.payment_status }}</dd>
+
+            <dt>Samskiptastaða</dt>
+            <dd>{{ order.contact_status }}</dd>
+
+            <dt>Dagsetning beiðni</dt>
+            <dd>{{ order.date_requested or '–' }}</dd>
+
+            <dt>Pöntun send</dt>
+            <dd>{{ order.date_ordered or '–' }}</dd>
+
+            <dt>Áætluð koma</dt>
+            <dd>
+                {{ order.estimated_arrival or '–' }}
+                {% if order.estimated_arrival and order.estimated_arrival < today and order.status not in ['Komið', 'Lokið'] %}
+                    <span class="badge badge-overdue">Seinkað</span>
+                {% endif %}
+            </dd>
+
+            <dt>Vara komin</dt>
+            <dd>{{ order.date_arrived or '–' }}</dd>
+
+            <dt>Lokið</dt>
+            <dd>{{ order.date_completed or '–' }}</dd>
+
+            <dt>Skráð</dt>
+            <dd>{{ order.created_at }}</dd>
+
+            <dt>Uppfært</dt>
+            <dd>{{ order.updated_at }}</dd>
+        </dl>
+
+        {% if order.notes %}
+        <div class="detail-notes">
+            <h3>Athugasemdir</h3>
+            <p>{{ order.notes }}</p>
+        </div>
+        {% endif %}
+
+        <div class="detail-actions">
+            <a class="btn btn-primary" href="{{ url_for('order_edit', order_id=order.id) }}">Breyta</a>
+
+            {% if status_idx < statuses|length - 1 %}
+            <form method="post" action="{{ url_for('order_status', order_id=order.id) }}" style="display:inline;">
+                <input type="hidden" name="status" value="{{ statuses[status_idx + 1] }}">
+                <button type="submit" class="btn btn-secondary">Færa í: {{ statuses[status_idx + 1] }}</button>
+            </form>
+            {% endif %}
+
+            <form method="post" action="{{ url_for('order_delete', order_id=order.id) }}"
+                  onsubmit="return confirm('Ertu viss um að þú viljir eyða þessari pöntun?');"
+                  style="display:inline;">
+                <button type="submit" class="btn btn-danger">Eyða</button>
+            </form>
+
+            <a class="btn btn-secondary" href="{{ url_for('board') }}">Til baka</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

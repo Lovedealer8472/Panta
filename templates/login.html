@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Innskráning – Pantanakerfi{% endblock %}
+{% block body %}
+<div style="position:fixed;top:.6rem;right:1rem;z-index:99;">
+    <button class="theme-toggle" onclick="toggleTheme()" title="Ljóst/Dökkt"></button>
+</div>
+<div class="login-wrap">
+    <div class="login-box">
+        <h1>Pantanakerfi</h1>
+        <form method="post">
+            <label for="password" style="display:block;text-align:left;font-size:.85rem;margin-bottom:.3rem;font-weight:600;">Lykilorð</label>
+            <input type="password" id="password" name="password" placeholder="Lykilorð" autofocus required>
+            <button type="submit">Skrá inn</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

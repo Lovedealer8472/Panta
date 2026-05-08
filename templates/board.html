@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Pantanakerfi{% endblock %}
+{% block body %}
+<div class="header">
+    <h1>Pantanakerfi</h1>
+    <div class="header-actions">
+        <form method="get" action="{{ url_for('board') }}" style="display:flex;gap:.35rem;">
+            <input class="search-input" type="text" name="q" value="{{ query }}" placeholder="Leita...">
+            <button class="btn btn-secondary btn-sm" type="submit">Leita</button>
+            {% if query %}
+                <a class="btn btn-secondary btn-sm" href="{{ url_for('board') }}">Hreinsa</a>
+            {% endif %}
+        </form>
+        <a class="btn btn-primary" href="{{ url_for('order_new') }}">+ Ný pöntun</a>
+        <button class="theme-toggle" onclick="toggleTheme()" title="Ljóst/Dökkt"></button>
+        <a class="btn btn-secondary btn-sm" href="{{ url_for('logout') }}">Útskrá</a>
+    </div>
+</div>
+
+<div class="board">
+    {% for status in statuses %}
+    <div class="column">
+        <div class="column-header">
+            <span>{{ status }}</span>
+            <span class="count">{{ columns[status]|length }}</span>
+        </div>
+        <div class="column-cards">
+            {% for order in columns[status] %}
+            <div class="card
+                {%- if order.priority == 'Brýnt' %} priority-brýnt
+                {%- elif order.priority == 'Mikilvægt' %} priority-mikilvægt{% endif %}"
+                 onclick="window.location='{{ url_for('order_detail', order_id=order.id) }}'"
+            >
+                <div class="card-customer">{{ order.customer_name }}</div>
+                <div class="card-product">{{ order.product_name }}{% if order.product_model %} – {{ order.product_model }}{% endif %}</div>
+                <div class="card-meta">
+                    {% if order.phone %}
+                        <span class="badge badge-phone">{{ order.phone }}</span>
+                    {% endif %}
+                    {% if order.estimated_arrival %}
+                        {% if order.estimated_arrival < today and status not in ['Komið', 'Lokið'] %}
+                            <span class="badge badge-overdue" title="Yfir áætlun">ETA: {{ order.estimated_arrival }}</span>
+                        {% else %}
+                            <span class="badge badge-eta">ETA: {{ order.estimated_arrival }}</span>
+                        {% endif %}
+                    {% endif %}
+                    <span class="badge badge-payment-{{ order.payment_status|lower }}">{{ order.payment_status }}</span>
+                </div>
+                <form class="card-status-form" method="post"
+                      action="{{ url_for('order_status', order_id=order.id) }}"
+                      onclick="event.stopPropagation();">
+                    <select name="status" onchange="this.form.submit()">
+                        {% for s in statuses %}
+                            <option value="{{ s }}" {% if s == order.status %}selected{% endif %}>{{ s }}</option>
+                        {% endfor %}
+                    </select>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
