@@ -37,7 +37,21 @@
             <dd>{{ order.payment_status }}</dd>
 
             <dt>Samskiptastaða</dt>
-            <dd>{{ order.contact_status }}</dd>
+            <dd>
+                <form method="post"
+                      action="{{ url_for('order_contact_status', order_id=order.id) }}"
+                      class="inline-select-form">
+                    <select name="contact_status" onchange="this.form.submit()"
+                            aria-label="Breyta samskiptastöðu">
+                        {% for opt in contact_options %}
+                            <option value="{{ opt }}"
+                                {% if opt == order.contact_status %}selected{% endif %}>
+                                {{ opt }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </form>
+            </dd>
 
             <dt>Dagsetning beiðni</dt>
             <dd>{{ order.date_requested or '–' }}</dd>

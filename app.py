@@ -460,6 +460,30 @@ def order_status(order_id):
     return redirect(url_for("board"))
 
 
+# ── Routes: Quick contact-status change ────────────────────────────
+
+
+@app.route("/order/<int:order_id>/contact_status", methods=["POST"])
+@login_required
+def order_contact_status(order_id):
+    new_value = request.form.get("contact_status", "")
+    if new_value not in CONTACT_OPTIONS:
+        abort(400)
+
+    db = get_db()
+    order = db.execute("SELECT id FROM orders WHERE id = ?", (order_id,)).fetchone()
+    if order is None:
+        abort(404)
+
+    now = datetime.now().isoformat(timespec="seconds")
+    db.execute(
+        "UPDATE orders SET contact_status=?, updated_at=? WHERE id=?",
+        (new_value, now, order_id),
+    )
+    db.commit()
+    return redirect(url_for("order_detail", order_id=order_id))
+
+
 # ── Routes: Attachments ────────────────────────────────────────────
 
 
