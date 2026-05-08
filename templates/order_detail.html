@@ -73,6 +73,24 @@
         </div>
         {% endif %}
 
+        <div class="detail-attachments" data-order-id="{{ order.id }}">
+            <h3>Viðhengi</h3>
+            <div id="dropzone" class="dropzone" tabindex="0" role="button"
+                 aria-label="Bæta við viðhengi">
+                <p class="dropzone-text">
+                    Dragðu skjöl hingað eða <span class="dropzone-link">smelltu til að velja</span>
+                </p>
+                <p class="dropzone-hint">PDF, myndir, Office-skjöl, hámark 25 MB á skrá.</p>
+            </div>
+            <input id="att-file-input" type="file" multiple
+                   accept=".pdf,image/*,.docx,.xlsx,.pptx,.doc,.xls,.ppt,.txt,.csv"
+                   style="display:none;">
+            <ul id="att-list" class="att-list" aria-live="polite"></ul>
+            <ul id="att-progress" class="att-progress"></ul>
+            <p id="att-empty" class="att-empty" hidden>Engin viðhengi skráð.</p>
+            <p id="att-error" class="att-error" hidden></p>
+        </div>
+
         <div class="detail-actions">
             <a class="btn btn-primary" href="{{ url_for('order_edit', order_id=order.id) }}">Breyta</a>
 
@@ -93,4 +111,184 @@
         </div>
     </div>
 </div>
+
+<script>
+(function () {
+    var box = document.querySelector('.detail-attachments');
+    if (!box) { return; }
+    var orderId = box.dataset.orderId;
+    var listUrl = '/order/' + orderId + '/attachments';
+    var dropzone = document.getElementById('dropzone');
+    var fileInput = document.getElementById('att-file-input');
+    var listEl = document.getElementById('att-list');
+    var progressEl = document.getElementById('att-progress');
+    var emptyEl = document.getElementById('att-empty');
+    var errorEl = document.getElementById('att-error');
+    var MAX_BYTES = 25 * 1024 * 1024;
+
+    function fmtSize(bytes) {
+        if (bytes < 1024) { return bytes + ' B'; }
+        if (bytes < 1024 * 1024) { return (bytes / 1024).toFixed(1) + ' KB'; }
+        return (bytes / (1024 * 1024)).toFixed(1) + ' MB'; }
+
+    function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, function (c) {
+            return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]);
+        });
+    }
+
+    function thumbHtml(att) {
+        if (att.mime_type && att.mime_type.indexOf('image/') === 0) {
+            return '<img class="att-thumb" src="' + att.url + '" alt="">';
+        }
+        var icon = 'DOC';
+        if (att.mime_type === 'application/pdf') { icon = 'PDF'; }
+        else if (/sheet|excel|csv/.test(att.mime_type || '')) { icon = 'XLS'; }
+        else if (/presentation|powerpoint/.test(att.mime_type || '')) { icon = 'PPT'; }
+        else if (/wordprocessing|msword/.test(att.mime_type || '')) { icon = 'DOC'; }
+        else if ((att.mime_type || '').indexOf('text/') === 0) { icon = 'TXT'; }
+        return '<span class="att-thumb att-thumb-icon">' + icon + '</span>';
+    }
+
+    function renderItem(att) {
+        var li = document.createElement('li');
+        li.className = 'att-item';
+        li.dataset.id = att.id;
+        li.innerHTML =
+            thumbHtml(att) +
+            '<div class="att-meta">' +
+                '<a class="att-name" href="' + att.url + '" target="_blank" rel="noopener">' +
+                    escapeHtml(att.filename) + '</a>' +
+                '<div class="att-sub">' + fmtSize(att.size_bytes) + ' &middot; ' +
+                    escapeHtml(att.uploaded_at) + '</div>' +
+            '</div>' +
+            '<div class="att-actions">' +
+                '<a class="btn btn-sm btn-secondary" href="' + att.url + '?download=1">Sækja</a>' +
+                '<button type="button" class="btn btn-sm btn-danger att-delete">Eyða</button>' +
+            '</div>';
+        li.querySelector('.att-delete').addEventListener('click', function () {
+            if (!confirm('Eyða þessu viðhengi?')) { return; }
+            fetch(att.delete_url, {
+                method: 'POST',
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'fetch' },
+            }).then(function (r) {
+                if (!r.ok) { throw new Error('delete-failed'); }
+                li.remove();
+                refreshEmptyState();
+            }).catch(function () {
+                showError('Tókst ekki að eyða viðhengi.');
+            });
+        });
+        return li;
+    }
+
+    function refreshEmptyState() {
+        emptyEl.hidden = listEl.children.length > 0;
+    }
+
+    function showError(msg) {
+        errorEl.textContent = msg;
+        errorEl.hidden = false;
+        setTimeout(function () { errorEl.hidden = true; }, 6000);
+    }
+
+    function loadList() {
+        fetch(listUrl, { headers: { 'Accept': 'application/json' } })
+            .then(function (r) { return r.ok ? r.json() : []; })
+            .then(function (rows) {
+                listEl.innerHTML = '';
+                rows.forEach(function (att) { listEl.appendChild(renderItem(att)); });
+                refreshEmptyState();
+            })
+            .catch(function () { /* leave empty */ });
+    }
+
+    function uploadOne(file) {
+        if (file.size > MAX_BYTES) {
+            showError('Skrá of stór: ' + escapeHtml(file.name) + ' (' + fmtSize(file.size) + ').');
+            return;
+        }
+        var li = document.createElement('li');
+        li.className = 'att-progress-item';
+        li.innerHTML =
+            '<div class="att-progress-name">' + escapeHtml(file.name) + '</div>' +
+            '<div class="att-progress-bar"><div class="att-progress-fill" style="width:0%"></div></div>';
+        progressEl.appendChild(li);
+        var fill = li.querySelector('.att-progress-fill');
+
+        var fd = new FormData();
+        fd.append('files', file);
+
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', listUrl);
+        xhr.setRequestHeader('Accept', 'application/json');
+        xhr.upload.onprogress = function (e) {
+            if (e.lengthComputable) {
+                fill.style.width = ((e.loaded / e.total) * 100).toFixed(0) + '%';
+            }
+        };
+        xhr.onload = function () {
+            li.remove();
+            var data = {};
+            try { data = JSON.parse(xhr.responseText || '{}'); } catch (e) {}
+            if (xhr.status >= 200 && xhr.status < 300 && data.saved) {
+                data.saved.forEach(function (att) {
+                    listEl.insertBefore(renderItem(att), listEl.firstChild);
+                });
+                refreshEmptyState();
+                if (data.rejected && data.rejected.length) {
+                    showError('Hafnað: ' + data.rejected.map(function (r) {
+                        return r.filename + ' (' + r.reason + ')';
+                    }).join(', '));
+                }
+            } else {
+                showError(data.error || ('Upphlaðning mistókst (' + xhr.status + ').'));
+            }
+        };
+        xhr.onerror = function () {
+            li.remove();
+            showError('Upphlaðning mistókst (nettenging).');
+        };
+        xhr.send(fd);
+    }
+
+    function uploadFiles(fileList) {
+        Array.prototype.forEach.call(fileList, uploadOne);
+    }
+
+    dropzone.addEventListener('click', function () { fileInput.click(); });
+    dropzone.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
+    });
+    fileInput.addEventListener('change', function () {
+        if (fileInput.files && fileInput.files.length) {
+            uploadFiles(fileInput.files);
+            fileInput.value = '';
+        }
+    });
+
+    ['dragenter', 'dragover'].forEach(function (ev) {
+        dropzone.addEventListener(ev, function (e) {
+            e.preventDefault(); e.stopPropagation();
+            dropzone.classList.add('is-dragover');
+        });
+    });
+    ['dragleave', 'dragend', 'drop'].forEach(function (ev) {
+        dropzone.addEventListener(ev, function (e) {
+            e.preventDefault(); e.stopPropagation();
+            dropzone.classList.remove('is-dragover');
+        });
+    });
+    dropzone.addEventListener('drop', function (e) {
+        if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
+            uploadFiles(e.dataTransfer.files);
+        }
+    });
+    // Prevent the page from navigating when files are dropped outside the zone.
+    window.addEventListener('dragover', function (e) { e.preventDefault(); });
+    window.addEventListener('drop', function (e) { e.preventDefault(); });
+
+    loadList();
+})();
+</script>
 {% endblock %}
